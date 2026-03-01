@@ -191,5 +191,6 @@ mongoose
     await client.login(process.env.AUTH_TOKEN!);
   })
   .catch((err) => console.error(err));
+console.info('Connected to MongoDB');
 
 export default YKSSmartBot;
