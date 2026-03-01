@@ -31,6 +31,7 @@ FROM node:18-slim
 # Runtime libs only (no -dev); ffmpeg for @discordjs/voice
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    build-essential \
     ffmpeg \
     libcairo2 \
     libpango-1.0-0 \

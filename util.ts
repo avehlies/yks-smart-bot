@@ -25,31 +25,31 @@ export const shuffle = (array: string[]) => {
   return array;
 };
 
-export const getRealKickstarters = async () => {
-  const fs = require('fs');
-  const readline = require('readline');
-  const { once } = require('events');
-  const responses: any = [];
-  // Grab from file of real kickstarters
-  const rl = readline.createInterface({
-    input: fs.createReadStream('assets/kickstarters-prepared-long-prompt-style.jsonl'),
-    crlfDelay: Infinity,
-  });
+// export const getRealKickstarters = async () => {
+//   const fs = require('fs');
+//   const readline = require('readline');
+//   const { once } = require('events');
+//   const responses: any = [];
+//   // Grab from file of real kickstarters
+//   const rl = readline.createInterface({
+//     input: fs.createReadStream('assets/kickstarters-prepared-long-prompt-style.jsonl'),
+//     crlfDelay: Infinity,
+//   });
 
-  rl.on('error', (err: any) => console.error(err));
+//   rl.on('error', (err: any) => console.error(err));
 
-  rl.on('line', (line: any) => {
-    if (!line) return;
+//   rl.on('line', (line: any) => {
+//     if (!line) return;
 
-    // Add completion to responses array.
-    let temp = { data: { choices: [{ text: JSON.parse(line).completion }] } };
-    responses.push(temp);
-  });
+//     // Add completion to responses array.
+//     let temp = { data: { choices: [{ text: JSON.parse(line).completion }] } };
+//     responses.push(temp);
+//   });
 
-  await once(rl, 'close');
+//   await once(rl, 'close');
 
-  return responses;
-};
+//   return responses;
+// };
 
 export const sleep = (ms: number) => {
   return new Promise((resolve) => {
