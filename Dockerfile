@@ -1,13 +1,10 @@
-# Use Node.js 18 LTS as base image
-FROM node:18-slim
+# -----------------------------------------------------------------------------
+# Stage 1: Build native modules (canvas, etc.) and install dependencies
+# -----------------------------------------------------------------------------
+FROM node:18-slim AS builder
 
-# Install system dependencies required for native modules and voice
-# - build-essential: C/C++ compiler and build tools (needed for canvas, @discordjs/opus, etc.)
-# - libcairo2-dev, libpango1.0-dev, etc.: required for canvas
-# - python3: Required for building native modules
-# - ffmpeg: Required by @discordjs/voice for playing MP3/arbitrary streams (prism-media)
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
     build-essential \
     libcairo2-dev \
     libpango1.0-dev \
@@ -15,30 +12,45 @@ RUN apt-get update && \
     libgif-dev \
     librsvg2-dev \
     python3 \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    && rm -rf /var/cache/apt/archives/*
 
-# Set working directory
 WORKDIR /app
-
-# Copy package files
 COPY package*.json ./
-
-# Install all dependencies (including dev dependencies for ts-node)
 RUN npm ci
 
-# Copy application source
+# Copy source so native modules can link; we'll copy full app in final stage
 COPY . .
 
-# Build TypeScript (if needed) or just copy source
-# Since the project uses ts-node, we'll run it directly
-# For production, you might want to compile TypeScript first
+# -----------------------------------------------------------------------------
+# Stage 2: Production image – runtime deps only, no build tools
+# -----------------------------------------------------------------------------
+FROM node:18-slim
 
-# Expose the port the app runs on
+# Runtime libs only (no -dev); ffmpeg for @discordjs/voice
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libcairo2 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libjpeg62-turbo \
+    libgif7 \
+    librsvg2-2 \
+    libpixman-1-0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    && rm -rf /var/cache/apt/archives/*
+
+WORKDIR /app
+
+# Copy package files, pre-built node_modules from builder, then app
+COPY package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY . .
+
 EXPOSE 3000
-
-# Set environment to production
 ENV NODE_ENV=production
 
-# Start the application
 CMD ["npm", "start"]
