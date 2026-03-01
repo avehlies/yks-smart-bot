@@ -34,13 +34,23 @@ const clipsCommand: CommandInterface = {
         return interaction.respond([{ name: 'Enter a search term.', value: '' }]);
       }
 
-      const results = await ClipsModel.find(
-        {
-          $text: { $search: searchPhrase },
-          transcription: { $exists: true },
+      /*
+      // Escape regex special chars so e.g. "what?" doesn't break the query
+      const escaped = searchPhrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const results = await ClipsModel.find({
+        transcription: {
+          $exists: true,
+          $regex: escaped,
+          $options: 'i',
         },
-        { score: { $meta: 'textScore' } },
-      ).sort({ score: { $meta: 'textScore' } });
+      });
+      */
+
+      const results = await ClipsModel.find({
+        $text: { $search: searchPhrase },
+        transcription: { $exists: true },
+      })
+      .sort({ score: { $meta: 'textScore' } });
 
       if (!results || results.length == 0) {
         return interaction.respond([{ name: 'No results.', value: '' }]);

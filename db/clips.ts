@@ -31,5 +31,5 @@ export const clipsSchema = new Schema(
   { minimize: false },
 );
 
-clipsSchema.index({ transcriptionIndex: 'text' }, { sparse: true });
+clipsSchema.index({ transcription: 'text' }, { sparse: true });
 export default mongoose.model('clips', clipsSchema);

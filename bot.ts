@@ -32,7 +32,7 @@ class YKSSmartBot extends AkairoClient {
   commandInteractions: CommandInteraction[];
   constructor() {
     super(
-      { ownerID: '329288617564569602' },
+      { ownerID: '293571605081358336' },
       {
         partials: [
           Constants.PartialTypes.REACTION,
@@ -166,14 +166,26 @@ class YKSSmartBot extends AkairoClient {
   }
 }
 
+// Construct MongoDB connection string
+// Support both local MongoDB (via MONGO_HOST) and MongoDB Atlas (default)
+const mongoHost = process.env.MONGO_HOST!;
+const mongoPort = process.env.MONGO_PORT!;
+const mongoUser = process.env.MONGO_USER!;
+const mongoPw = process.env.MONGO_PW!;
+const mongoDb = process.env.MONGO_DB!;
+
+// Use mongodb:// for local connections, mongodb+srv:// for Atlas
+// Local MongoDB with MONGO_INITDB_ROOT_* creates the user in admin DB → authSource=admin
+const mongoConnectionString = mongoHost.includes('mongodb.net')
+  ? `mongodb+srv://${mongoUser}:${mongoPw}@${mongoHost}/${mongoDb}?retryWrites=true&w=majority`
+  : `mongodb://${mongoUser}:${mongoPw}@${mongoHost}:${mongoPort}/${mongoDb}?authSource=admin&retryWrites=true&w=majority`;
+
+console.info('Connecting to MongoDB...');
 mongoose
-  .connect(
-    `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PW}@cluster0.fnwjf.mongodb.net/${process.env.MONGO_DB}?retryWrites=true&w=majority`,
-    {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    } as ConnectOptions,
-  )
+  .connect(mongoConnectionString, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  } as ConnectOptions)
   .then(async () => {
     const client = new YKSSmartBot();
     await client.login(process.env.AUTH_TOKEN!);

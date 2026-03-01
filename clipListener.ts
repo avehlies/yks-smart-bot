@@ -19,7 +19,13 @@ class ClipListener extends Listener {
       message.author.id !== this.client.user.id &&
       message.channel.id === process.env.YKS_CLIP_CHANNEL_ID &&
       message.attachments.size > 0
-    )
+    ) {
+      console.info(`Adding new clip: ${message.id}`);
+      let clipExists = await ClipsModel.findOne({ id: message.id });
+      if (clipExists) {
+        console.info(`Clip already exists: ${message.id}`);
+        return;
+      }
       await Promise.all(
         message.attachments.map(async (attachment) => {
           const contentType = attachment.contentType?.split('/')[0];
@@ -40,6 +46,7 @@ class ClipListener extends Listener {
           }
         }),
       );
+    }
   }
 }
 

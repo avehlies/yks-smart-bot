@@ -13,6 +13,20 @@ const {
   StreamType,
 } = require('@discordjs/voice');
 const prettyMilliseconds = require('pretty-ms');
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const { pipeline } = require('stream/promises');
+
+async function removeTempFile(filePath: string | undefined) {
+  if (!filePath) return;
+  try {
+    await fs.promises.unlink(filePath);
+  } catch {
+    // ignore
+  }
+}
 
 class ListenCommand extends Command {
   constructor() {
@@ -38,9 +52,11 @@ class ListenCommand extends Command {
 
     let respond = async (response: any) => {
       if (this.client.listen.response) {
-        this.client.listen.response.edit(response);
-      } else {
-        this.client.listen.response = await this.client.listen.message.reply(response);
+        this.client.listen.response.edit(response).catch(() => {});
+      } else if (this.client.listen.message) {
+        this.client.listen.response = await this.client.listen.message
+          .reply(response)
+          .catch(() => null);
       }
     };
 
@@ -142,37 +158,32 @@ class ListenCommand extends Command {
       adapterCreator: channel.guild.voiceAdapterCreator,
     });
 
-    try {
-      await entersState(connection, VoiceConnectionStatus.Ready, 30000);
-      this.client.listen.connection = connection;
-      this.client.listen.connection.subscribe(this.client.listen.player);
-
-      const resource = createAudioResource(ep.enclosure.url, {
-        inputType: StreamType.Arbitrary,
-      });
-      this.client.listen.player.play(resource);
-    } catch (e) {
-      message.channel.send('Failed to join the voice channel');
-      connection?.destroy();
-      this.client.listen.connection = null;
-      console.error(e);
-    }
-
+    // Attach listeners before play() so we don't miss Idle or error when resource ends immediately
     this.client.listen.player.on(AudioPlayerStatus.Idle, (oldState: any, newState: any) => {
       if (oldState.status === newState.status) return;
       clearInterval(this.client.listen.interval);
-      respond('Finished playing episode.');
+      if (!this.client.listen._errorAlreadyResponded) {
+        const duration = this.client.listen.player.state.playbackDuration ?? 0;
+        if (duration < 2000) {
+          respond('Playback failed to start (stream may be unavailable or invalid).').catch(() => {});
+        } else {
+          respond('Finished playing episode.').catch(() => {});
+        }
+      }
+      removeTempFile(this.client.listen._tempFilePath);
+      this.client.listen._tempFilePath = undefined;
       this.client.listen.connection?.destroy();
       this.client.listen.connection = null;
       this.client.listen.player.removeAllListeners();
       this.client.listen.embed = null;
       this.client.listen.message = null;
       this.client.listen.response = null;
+      this.client.listen._errorAlreadyResponded = undefined;
     });
 
     this.client.listen.player.on(AudioPlayerStatus.Paused, (oldState: any, newState: any) => {
       if (oldState.status === newState.status) return;
-      respond(`Paused at ${prettyMilliseconds(newState.playbackDuration)}.`);
+      respond(`Paused at ${prettyMilliseconds(newState.playbackDuration)}.`).catch(() => {});
     });
 
     this.client.listen.player.on(AudioPlayerStatus.Buffering, () => {});
@@ -183,11 +194,81 @@ class ListenCommand extends Command {
         oldState.status === AudioPlayerStatus.Paused ||
         oldState.status === AudioPlayerStatus.AutoPaused
       ) {
-        respond('Resuming.');
+        respond('Resuming.').catch(() => {});
       }
     });
 
-    this.client.listen.player.on('error', console.error);
+    this.client.listen.player.on('error', (err: Error & { resource?: { playbackDuration?: number } }) => {
+      const isAborted =
+        err.message?.toLowerCase().includes('aborted') ||
+        (err as NodeJS.ErrnoException).code === 'ECONNRESET';
+      if (isAborted && (err.resource?.playbackDuration ?? 0) > 0) {
+        console.warn('Audio stream closed (often happens when pausing a live stream):', err.message);
+        this.client.listen._errorAlreadyResponded = true;
+        respond('Playback stopped (stream connection closed). Pausing while streaming can cause this.').catch(
+          () => {},
+        );
+      } else {
+        console.error('Audio player error:', err);
+        this.client.listen._errorAlreadyResponded = true;
+        respond('Playback error.').catch(() => {});
+      }
+      removeTempFile(this.client.listen._tempFilePath);
+      this.client.listen._tempFilePath = undefined;
+    });
+
+    try {
+      console.info(`Joining voice channel ${channel.name}...`);
+      await entersState(connection, VoiceConnectionStatus.Ready, 30000);
+      console.info(`Voice channel ${channel.name} joined successfully.`);
+      this.client.listen.connection = connection;
+      this.client.listen.connection.subscribe(this.client.listen.player);
+      console.info(`Subscribed to player.`);
+
+      // Download to temp file so pause/resume works (no live stream to close)
+      const audioUrl = ep.enclosure.url;
+      const tempFilePath = path.join(
+        os.tmpdir(),
+        `yks-listen-${Date.now()}-${require('crypto').randomBytes(4).toString('hex')}.tmp`,
+      );
+      this.client.listen._tempFilePath = tempFilePath;
+
+      await message.reply('Downloading episode...').catch(() => {});
+
+      try {
+        const { data } = await axios.get(audioUrl, {
+          responseType: 'stream',
+          timeout: 60000,
+          headers: { 'User-Agent': 'YKS-Smart-Bot/1 (Podcast listener)' },
+          validateStatus: (status: number) => status >= 200 && status < 400,
+        });
+        const writeStream = fs.createWriteStream(tempFilePath);
+        await pipeline(data, writeStream);
+      } catch (downloadErr: any) {
+        console.error('Failed to download audio:', downloadErr.message);
+        removeTempFile(tempFilePath);
+        this.client.listen._tempFilePath = undefined;
+        await message.channel.send('Could not download audio. Check bot logs.');
+        connection.destroy();
+        this.client.listen.connection = null;
+        this.client.listen.player.removeAllListeners();
+        return;
+      }
+
+      const resource = createAudioResource(tempFilePath, {
+        inputType: StreamType.Arbitrary,
+      });
+      console.info('Playing from local file...');
+      this.client.listen.player.play(resource);
+    } catch (e) {
+      message.channel.send('Failed to join the voice channel').catch(() => {});
+      removeTempFile(this.client.listen._tempFilePath);
+      this.client.listen._tempFilePath = undefined;
+      connection?.destroy();
+      this.client.listen.connection = null;
+      this.client.listen.player.removeAllListeners();
+      console.error(e);
+    }
 
     const epNum = ep.title.match(/Episode [0-9]+/i);
     let epTitle =
@@ -236,12 +317,18 @@ class ListenCommand extends Command {
       .send({ embeds: [mainEmbed] })
       .catch((err) => console.error(err));
 
-    await this.client.listen.message.react('⏸');
-    await this.client.listen.message.react('⏹');
-    await this.client.listen.message.react('▶️');
+    if (this.client.listen.message) {
+      await this.client.listen.message.react('⏸').catch(() => {});
+      await this.client.listen.message.react('⏹').catch(() => {});
+      await this.client.listen.message.react('▶️').catch(() => {});
+    }
     const listen = this.client.listen;
     this.client.listen.interval = setInterval(
       () => {
+        if (!listen.embed?.fields) {
+          clearInterval(listen.interval);
+          return;
+        }
         listen.embed.fields[1].name = `Progress (${prettyMilliseconds(
           listen.player.state.playbackDuration ? listen.player.state.playbackDuration : 0,
           { colonNotation: true },
@@ -257,7 +344,7 @@ class ListenCommand extends Command {
           '🟢' +
           progressStr.substring(progress) +
           '\\|';
-        listen.message.edit({ embeds: [listen.embed] });
+        if (listen.message) listen.message.edit({ embeds: [listen.embed] }).catch(() => {});
       },
       10 * 1000, // every 10 sec
       // @ts-ignore

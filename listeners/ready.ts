@@ -11,7 +11,11 @@ const Parser = require('rss-parser');
 const parser = new Parser();
 const MAIN_FEED_RSS = process.env.MAIN_FEED_RSS;
 const BONUS_FEED_RSS = process.env.BONUS_FEED_RSS;
-const { createAudioPlayer, NoSubscriberBehavior } = require('@discordjs/voice');
+const {
+  createAudioPlayer,
+  NoSubscriberBehavior,
+  generateDependencyReport,
+} = require('@discordjs/voice');
 class ReadyListener extends Listener {
   constructor() {
     super('ready', {
@@ -52,8 +56,13 @@ class ReadyListener extends Listener {
     await setupSlashCommands(this.client);
 
     //- Break in case of emergency -//
+    console.info('GATHER_ALL_CLIPS: ', process.env.GATHER_ALL_CLIPS);
     if (process.env.GATHER_ALL_CLIPS === 'true') {
+      console.info('Gathering all clips...');
       await gatherAllClips(this.client);
+      console.info('Done gathering all clips.');
+    } else {
+      console.info('Not gathering all clips.');
     }
     //- Break in case of emergency -//
   }
@@ -217,12 +226,8 @@ async function removeOldMailbagMessages(client: YKSSmartBot) {
 const gatherAllClips = async (client: YKSSmartBot) => {
   const guild = client.util.resolveGuild(process.env.YKS_GUILD_ID!, client.guilds.cache);
   if (!guild) return null;
-  const channel = client.util.resolveChannel(
-    process.env.YKS_CLIP_CHANNEL_ID!,
-    guild.channels.cache,
-  );
+  const channel = client.util.resolveChannel(process.env.YKS_CLIP_CHANNEL_ID!, guild.channels.cache);
   if (!channel || !channel.isText()) return null;
-
   console.info('Fetching all messages in the YKS clips channel and fillng in the gaps.');
   let messages = Array.from((await channel.messages.fetch({ limit: 100 }))?.values() || []);
   while (messages.length > 0) {

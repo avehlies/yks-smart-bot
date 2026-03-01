@@ -81,13 +81,15 @@ export const transcribeClip = async (url: string): Promise<string | null> => {
     console.info(`Successfully downloaded clip, saved to: [${fileName}]`);
     console.info(`Converting [${fileName}] to 16KHz WAV...`);
     try {
-      fileName = await convertTo16KhzWav(fileName);
-      if (fileName) {
-        console.info(`Successfully converted to 16KHz WAV. Attempting to transcribe...`);
+      let wavFileName = await convertTo16KhzWav(fileName);
+      fs.unlinkSync(fileName);
+      if (wavFileName) {
+        console.info(`Successfully converted ${wavFileName} to 16KHz WAV. Attempting to transcribe...`);
         try {
-          await transcribeFile(fileName);
+          await transcribeFile(wavFileName);
+          fs.unlinkSync(wavFileName);
           return fs
-            .readFileSync(`${fileName}.txt`, 'utf8')
+            .readFileSync(`${wavFileName}.txt`, 'utf8')
             .replace(/(?:\r\n|\r|\n)/g, ' ')
             .replace(/\s\s+/g, ' ')
             .trim();
