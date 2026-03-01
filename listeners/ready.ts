@@ -7,6 +7,9 @@ import commandList from '../commands/slash/_commands';
 
 const { Listener } = require('discord-akairo');
 const SessionModel = require('../db/sessions');
+const ClipsModel = require('../db/clips').default;
+// Lazy-load transcribe to avoid loading whisper-node during listener discovery (whisper-node's
+// shell.js does shelljs.cd() at load time, which breaks path resolution for remaining listeners).
 const Parser = require('rss-parser');
 const parser = new Parser();
 const MAIN_FEED_RSS = process.env.MAIN_FEED_RSS;
@@ -65,6 +68,10 @@ class ReadyListener extends Listener {
       console.info('Not gathering all clips.');
     }
     //- Break in case of emergency -//
+
+    // Backfill transcriptions for clips that don't have one (periodically)
+    const TRANSCRIPTION_BACKFILL_INTERVAL_MS = 5 * 60 * 1000; // 10 minutes
+    setInterval(backfillMissingTranscriptions, TRANSCRIPTION_BACKFILL_INTERVAL_MS);
   }
 }
 
@@ -222,6 +229,51 @@ async function removeOldMailbagMessages(client: YKSSmartBot) {
   console.info('Cleared old mailbag messages.');
   return client.settings.set(process.env.YKS_GUILD_ID!, 'mailbagMessages', mailbagMessages);
 }
+
+let isBackfillRunning = false;
+
+const backfillMissingTranscriptions = async () => {
+  if (isBackfillRunning) {
+    console.info('Transcription backfill already in progress, skipping this run.');
+    return;
+  }
+  isBackfillRunning = true;
+  try {
+    const { transcribeClip } = require('../transcribe');
+    const clipsWithoutTranscription = await ClipsModel.find({
+      $or: [
+        { transcription: { $exists: false } },
+        { transcription: null },
+        { transcription: '' },
+      ],
+    })
+    .limit(10)
+    .lean();
+
+    if (clipsWithoutTranscription.length === 0) {
+      console.info('No clips missing transcription.');
+      return;
+    }
+
+    console.info(`Backfilling transcriptions for ${clipsWithoutTranscription.length} clip(s) (one at a time).`);
+    for (const clip of clipsWithoutTranscription) {
+      const url = clip.url;
+      if (!url) continue;
+      try {
+        const transcription = await transcribeClip(url);
+        if (transcription) {
+          console.log(transcription);
+          await ClipsModel.updateOne({ id: clip.id }, { $set: { transcription } });
+        }
+      } catch (err) {
+        console.error(`Failed to transcribe clip ${clip.id}:`, err);
+      }
+    }
+    console.info('Done backfilling transcriptions.');
+  } finally {
+    isBackfillRunning = false;
+  }
+};
 
 const gatherAllClips = async (client: YKSSmartBot) => {
   const guild = client.util.resolveGuild(process.env.YKS_GUILD_ID!, client.guilds.cache);

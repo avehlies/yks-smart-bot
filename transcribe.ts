@@ -88,11 +88,13 @@ export const transcribeClip = async (url: string): Promise<string | null> => {
         try {
           await transcribeFile(wavFileName);
           fs.unlinkSync(wavFileName);
-          return fs
+          let transcription = fs
             .readFileSync(`${wavFileName}.txt`, 'utf8')
             .replace(/(?:\r\n|\r|\n)/g, ' ')
             .replace(/\s\s+/g, ' ')
             .trim();
+            fs.unlinkSync(`${wavFileName}.txt`);
+            return transcription;
         } catch {}
       }
     } catch {}

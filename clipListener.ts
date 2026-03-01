@@ -38,11 +38,6 @@ class ClipListener extends Listener {
               { upsert: true },
             );
             console.info(`Added new clip: ${url}`);
-            const transcription = await transcribeClip(url);
-            if (transcription) {
-              console.log(transcription);
-              await ClipsModel.updateOne({ id: message.id }, { $set: { transcription } });
-            }
           }
         }),
       );
