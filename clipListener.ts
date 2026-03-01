@@ -21,7 +21,17 @@ class ClipListener extends Listener {
       message.attachments.size > 0
     ) {
       console.info(`Adding new clip: ${message.id}`);
-      let clipExists = await ClipsModel.findOne({ id: message.id });
+      const urls = message.attachments
+        .filter((a) => ['video', 'audio'].includes(a.contentType?.split('/')[0] ?? ''))
+        .map((a) => a.proxyURL);
+      const truncatedUrls = urls.map((u) => u.split('?')[0]);
+      const clipExists = await ClipsModel.findOne({
+        $or: [
+          { id: message.id },
+          { url: { $in: urls } },
+          { truncatedUrl: { $in: truncatedUrls } },
+        ],
+      });
       if (clipExists) {
         console.info(`Clip already exists: ${message.id}`);
         return;
