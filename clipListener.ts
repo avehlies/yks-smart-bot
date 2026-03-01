@@ -17,6 +17,7 @@ class ClipListener extends Listener {
     // the link in the database.
     if (
       message.author.id !== this.client.user.id &&
+      message.author.id !== '789204496097214514' &&
       message.channel.id === process.env.YKS_CLIP_CHANNEL_ID &&
       message.attachments.size > 0
     ) {
