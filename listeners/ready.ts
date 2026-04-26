@@ -69,9 +69,11 @@ class ReadyListener extends Listener {
     }
     //- Break in case of emergency -//
 
-    // Backfill transcriptions for clips that don't have one (periodically)
-    const TRANSCRIPTION_BACKFILL_INTERVAL_MS = 5 * 60 * 1000; // 10 minutes
-    setInterval(backfillMissingTranscriptions, TRANSCRIPTION_BACKFILL_INTERVAL_MS);
+    if (process.env.TRANSCRIBE_CLIPS === 'true') {
+      // Backfill transcriptions for clips that don't have one (periodically)
+      const TRANSCRIPTION_BACKFILL_INTERVAL_MS = 1 * 60 * 1000; // 1 minute
+      setInterval(backfillMissingTranscriptions, TRANSCRIPTION_BACKFILL_INTERVAL_MS);
+    }
   }
 }
 
@@ -244,14 +246,12 @@ const backfillMissingTranscriptions = async () => {
       $or: [
         { transcription: { $exists: false } },
         { transcription: null },
-        { transcription: '' },
       ],
     })
     .limit(10)
     .lean();
 
     if (clipsWithoutTranscription.length === 0) {
-      console.info('No clips missing transcription.');
       return;
     }
 
@@ -264,9 +264,13 @@ const backfillMissingTranscriptions = async () => {
         if (transcription) {
           console.log(transcription);
           await ClipsModel.updateOne({ id: clip.id }, { $set: { transcription } });
+        } else {
+          await ClipsModel.updateOne({ id: clip.id }, { $set: { transcription: '' } });
+          console.error(`Failed to transcribe clip ${clip.id}: transcription is null`);
         }
       } catch (err) {
         console.error(`Failed to transcribe clip ${clip.id}:`, err);
+        await ClipsModel.updateOne({ id: clip.id }, { $set: { transcription: '' } });
       }
     }
     console.info('Done backfilling transcriptions.');

@@ -2,8 +2,37 @@ import { https } from 'follow-redirects';
 import fs from 'fs';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegStatic from 'ffmpeg-static';
-// @ts-ignore
-import whisper from 'whisper-node';
+// wavefile: default export is { WaveFile } in CJS; use require for compatibility
+const WaveFile = require('wavefile').WaveFile as new (
+  buffer: Buffer,
+) => {
+  toBitDepth: (depth: string) => void;
+  toSampleRate: (rate: number) => void;
+  getSamples: () => Float32Array | Float32Array[];
+};
+
+const WHISPER_MODEL = 'Xenova/whisper-tiny.en';
+
+type TranscriberFn = (
+  audio: Float32Array,
+  options?: { chunk_length_s?: number; stride_length_s?: number },
+) => Promise<{ text: string }>;
+
+let transcriberPromise: Promise<TranscriberFn> | null = null;
+
+function getTranscriber(): Promise<TranscriberFn> {
+  if (!transcriberPromise) {
+    transcriberPromise = (async () => {
+      const { pipeline } = await import('@xenova/transformers');
+      const p = await pipeline(
+        'automatic-speech-recognition',
+        WHISPER_MODEL,
+      );
+      return p as TranscriberFn;
+    })();
+  }
+  return transcriberPromise!;
+}
 
 export const downloadFile = (url: string): Promise<string | null> => {
   return new Promise((resolve, reject) => {
@@ -40,7 +69,9 @@ export const convertTo16KhzWav = (fileName: string): Promise<string> => {
       .outputOptions('-acodec', 'pcm_s16le', '-ac', '1', '-ar', '16000')
       .saveToFile(`${fileName}.wav`)
       .on('error', (e: any) => {
-        console.error(`Failed to convert [${fileName}] to 16Khz WAV: ${JSON.stringify(e)}`);
+        console.error(
+          `Failed to convert [${fileName}] to 16Khz WAV: ${JSON.stringify(e)}`,
+        );
         return reject();
       })
       .on('progress', (progress: any) => {
@@ -49,57 +80,100 @@ export const convertTo16KhzWav = (fileName: string): Promise<string> => {
         }
       })
       .on('end', () => {
-        console.info(`Successfully converted [${fileName}] to 16Khz WAV at [${fileName}.wav]`);
+        console.info(
+          `Successfully converted [${fileName}] to 16Khz WAV at [${fileName}.wav]`,
+        );
         return resolve(`${fileName}.wav`);
       });
   });
 };
 
+/**
+ * Load a WAV file and convert to Float32Array at 16kHz mono for Whisper.
+ */
+function loadWavAsFloat32(wavPath: string): Float32Array {
+  const buffer = fs.readFileSync(wavPath);
+  const wav = new WaveFile(buffer);
+  wav.toBitDepth('32f');
+  wav.toSampleRate(16000);
+  let samples = wav.getSamples() as Float32Array | Float32Array[];
+
+  // Mono: getSamples() returns Float32Array; stereo: array of two Float32Arrays
+  if (Array.isArray(samples) && samples.length > 1) {
+    const [left, right] = samples;
+    const merged = new Float32Array(left.length);
+    const scale = Math.SQRT1_2;
+    for (let i = 0; i < left.length; ++i) {
+      merged[i] = scale * (left[i] + right[i]);
+    }
+    samples = merged;
+  } else if (Array.isArray(samples)) {
+    samples = samples[0];
+  }
+  return samples as Float32Array;
+}
+
+/** Chunk length in seconds for long audio (Whisper default is 30). */
+const CHUNK_LENGTH_S = 30;
+/** Stride between chunks in seconds for overlap. */
+const STRIDE_LENGTH_S = 5;
+
 export const transcribeFile = async (fileName: string): Promise<string> => {
-  return whisper(fileName, {
-    modelPath: `${__dirname}/ggml-base.en.bin`,
-    whisperOptions: { word_timestamps: false, gen_file_txt: true },
+  const transcriber = await getTranscriber();
+  if (!transcriber) throw new Error('Transcriber failed to load');
+  const audioData = loadWavAsFloat32(fileName);
+  const output = await transcriber(audioData, {
+    chunk_length_s: CHUNK_LENGTH_S,
+    stride_length_s: STRIDE_LENGTH_S,
   });
+  return typeof output === 'string' ? output : (output?.text ?? '');
 };
 
 export const transcribeClip = async (url: string): Promise<string | null> => {
-  if (!fs.existsSync(`${__dirname}/ggml-base.en.bin`)) {
-    try {
-      console.info('Downloading');
-      await downloadFile(
-        `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin`,
-      );
-    } catch {
-      return null;
-    }
-  }
-
   console.info(`Starting transcription process of [${url}].`);
   console.info(`Downloading clip from [${url}]`);
   let fileName: string | null = await downloadFile(url);
-  if (fileName) {
-    console.info(`Successfully downloaded clip, saved to: [${fileName}]`);
-    console.info(`Converting [${fileName}] to 16KHz WAV...`);
-    try {
-      let wavFileName = await convertTo16KhzWav(fileName);
-      fs.unlinkSync(fileName);
-      if (wavFileName) {
-        console.info(`Successfully converted ${wavFileName} to 16KHz WAV. Attempting to transcribe...`);
-        try {
-          await transcribeFile(wavFileName);
-          fs.unlinkSync(wavFileName);
-          let transcription = fs
-            .readFileSync(`${wavFileName}.txt`, 'utf8')
-            .replace(/(?:\r\n|\r|\n)/g, ' ')
-            .replace(/\s\s+/g, ' ')
-            .trim();
-            fs.unlinkSync(`${wavFileName}.txt`);
-            return transcription;
-        } catch {}
-      }
-    } catch {}
-  } else {
-    console.error(`Failed to download and transcribe clip at url [${url}]`);
+  let wavFileName: string | null = null;
+  let transcription: string | null = null;
+
+  if (!fileName) {
+    console.error(`Failed to download clip from [${url}]`);
+    return null;
   }
-  return null;
+
+  console.info(`Successfully downloaded clip, saved to: [${fileName}]`);
+  console.info(`Converting [${fileName}] to 16KHz WAV...`);
+  try {
+    wavFileName = await convertTo16KhzWav(fileName);
+  } catch {
+    console.error(`Failed to convert [${fileName}] to 16KHz WAV`);
+    try {
+      fs.unlinkSync(fileName);
+    } catch (_) {}
+    return null;
+  }
+
+  try {
+    console.info(
+      `Successfully converted ${wavFileName} to 16KHz WAV. Attempting to transcribe with ${WHISPER_MODEL}...`,
+    );
+    transcription = await transcribeFile(wavFileName as string);
+    if (transcription == null || transcription === '') {
+      console.error(`Failed to transcribe file [${wavFileName}]`);
+      throw new Error(`Failed to transcribe file [${wavFileName}]`);
+    }
+  } finally {
+    if (fileName) {
+      try {
+        fs.unlinkSync(fileName);
+      } catch (_) {}
+    }
+    if (wavFileName) {
+      try {
+        fs.unlinkSync(wavFileName);
+      } catch (_) {}
+    }
+  }
+
+  return transcription;
 };

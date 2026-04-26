@@ -15,6 +15,46 @@ import YKSSmartBot from '../../bot';
 import ClipsModel from '../../db/clips';
 
 const commandName = 'findtheclimp';
+
+function transcriptionSnippetAround (
+  text: string,
+  phrase: string,
+  maxLen: number
+): string {
+  if (text.length <= maxLen) return text;
+  if (!phrase.trim()) return text.substring(0, maxLen);
+
+  const lower = text.toLowerCase();
+  const idx = lower.indexOf(phrase.toLowerCase());
+  if (idx === -1) return text.substring(0, maxLen);
+
+  const center = idx + phrase.length / 2;
+  let start = Math.floor(center - maxLen / 2);
+  start = Math.max(0, Math.min(start, text.length - maxLen));
+
+  let result = text.substring(start, start + maxLen);
+  if (start > 0) {
+    result = "..." + result;
+  }
+  if (start + maxLen < text.length) {
+    result = result + "...";
+  }
+  return result;
+};
+
+function sliceMap<K, V>(map: Map<K, V>, start: number, end: number): Map<K, V> {
+  const result = new Map<K, V>();
+  let i = 0;
+  for (const entry of map) {
+    if (i >= start && i < end) {
+      result.set(entry[0], entry[1]);
+    }
+    if (i >= end) break;
+    i++;
+  }
+  return result;
+}
+
 const clipsCommand: CommandInterface = {
   data: new SlashCommandBuilder()
     .setName(commandName)
@@ -61,15 +101,19 @@ const clipsCommand: CommandInterface = {
         resultsHash.set(result.transcription?.toLowerCase(), result);
       });
 
-      const choices = Array.from(resultsHash.values()).map((result: any) => {
-        const name =
-          result.transcription.length > 100
-            ? result.transcription.substring(0, 97) + '...'
-            : result.transcription;
+      const data = sliceMap(resultsHash, 0, 20);
+
+      const choices = Array.from(data.values()).map((result: any) => {
+        const name = transcriptionSnippetAround(
+          result.transcription,
+          searchPhrase,
+          94
+        );
+        // const name = result.transcription.substring(0, 94);
         return { name, value: result._id };
       });
 
-      await interaction.respond(choices.slice(0, 25));
+      await interaction.respond(choices);
     } catch (e: any) {
       console.error(e);
     }
