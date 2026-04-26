@@ -50,6 +50,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY . .
+COPY assets ./assets
 
 EXPOSE 3000
 ENV NODE_ENV=production

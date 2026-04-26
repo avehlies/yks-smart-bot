@@ -1,7 +1,6 @@
 import { Message } from 'discord.js';
 const { Listener } = require('discord-akairo');
 import ClipsModel from './db/clips';
-import { transcribeClip } from './transcribe';
 
 class ClipListener extends Listener {
   constructor() {
@@ -21,7 +20,6 @@ class ClipListener extends Listener {
       message.channel.id === process.env.YKS_CLIP_CHANNEL_ID &&
       message.attachments.size > 0
     ) {
-      console.info(`Adding new clip: ${message.id}`);
       const urls = message.attachments
         .filter((a) => ['video', 'audio'].includes(a.contentType?.split('/')[0] ?? ''))
         .map((a) => a.proxyURL);
@@ -37,6 +35,7 @@ class ClipListener extends Listener {
         console.info(`Clip already exists: ${message.id}`);
         return;
       }
+      console.info(`Adding new clip: ${message.id}`);
       await Promise.all(
         message.attachments.map(async (attachment) => {
           const contentType = attachment.contentType?.split('/')[0];
