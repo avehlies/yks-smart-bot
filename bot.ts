@@ -15,6 +15,8 @@ import { CommandInterface } from './interfaces/command';
 require('dotenv').config();
 import guildModel from './db/model';
 import clipsModel from './db/clips';
+import { simpleCommandConfigs } from './commands/config/simpleCommands';
+import { createConfigurableCommandClasses } from './commands/configurable';
 
 class YKSSmartBot extends AkairoClient {
   settings: MongooseProvider;
@@ -144,6 +146,9 @@ class YKSSmartBot extends AkairoClient {
     });
 
     this.commandHandler.loadAll();
+    for (const configurableCommandClass of createConfigurableCommandClasses(simpleCommandConfigs)) {
+      this.commandHandler.load(configurableCommandClass);
+    }
     this.commandHandler.useInhibitorHandler(this.inhibitorHandler);
     this.inhibitorHandler.loadAll();
     this.commandHandler.useListenerHandler(this.listenerHandler);
