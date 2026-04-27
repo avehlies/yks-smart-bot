@@ -25,11 +25,7 @@ class ClipListener extends Listener {
         .map((a) => a.proxyURL);
       const truncatedUrls = urls.map((u) => u.split('?')[0]);
       const clipExists = await ClipsModel.findOne({
-        $or: [
-          { id: message.id },
-          { url: { $in: urls } },
-          { truncatedUrl: { $in: truncatedUrls } },
-        ],
+        $or: [{ id: message.id }, { url: { $in: urls } }, { truncatedUrl: { $in: truncatedUrls } }],
       });
       if (clipExists) {
         console.info(`Clip already exists: ${message.id}`);

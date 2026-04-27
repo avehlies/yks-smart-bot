@@ -165,7 +165,9 @@ class ListenCommand extends Command {
       if (!this.client.listen._errorAlreadyResponded) {
         const duration = this.client.listen.player.state.playbackDuration ?? 0;
         if (duration < 2000) {
-          respond('Playback failed to start (stream may be unavailable or invalid).').catch(() => {});
+          respond('Playback failed to start (stream may be unavailable or invalid).').catch(
+            () => {},
+          );
         } else {
           respond('Finished playing episode.').catch(() => {});
         }
@@ -198,24 +200,30 @@ class ListenCommand extends Command {
       }
     });
 
-    this.client.listen.player.on('error', (err: Error & { resource?: { playbackDuration?: number } }) => {
-      const isAborted =
-        err.message?.toLowerCase().includes('aborted') ||
-        (err as NodeJS.ErrnoException).code === 'ECONNRESET';
-      if (isAborted && (err.resource?.playbackDuration ?? 0) > 0) {
-        console.warn('Audio stream closed (often happens when pausing a live stream):', err.message);
-        this.client.listen._errorAlreadyResponded = true;
-        respond('Playback stopped (stream connection closed). Pausing while streaming can cause this.').catch(
-          () => {},
-        );
-      } else {
-        console.error('Audio player error:', err);
-        this.client.listen._errorAlreadyResponded = true;
-        respond('Playback error.').catch(() => {});
-      }
-      removeTempFile(this.client.listen._tempFilePath);
-      this.client.listen._tempFilePath = undefined;
-    });
+    this.client.listen.player.on(
+      'error',
+      (err: Error & { resource?: { playbackDuration?: number } }) => {
+        const isAborted =
+          err.message?.toLowerCase().includes('aborted') ||
+          (err as NodeJS.ErrnoException).code === 'ECONNRESET';
+        if (isAborted && (err.resource?.playbackDuration ?? 0) > 0) {
+          console.warn(
+            'Audio stream closed (often happens when pausing a live stream):',
+            err.message,
+          );
+          this.client.listen._errorAlreadyResponded = true;
+          respond(
+            'Playback stopped (stream connection closed). Pausing while streaming can cause this.',
+          ).catch(() => {});
+        } else {
+          console.error('Audio player error:', err);
+          this.client.listen._errorAlreadyResponded = true;
+          respond('Playback error.').catch(() => {});
+        }
+        removeTempFile(this.client.listen._tempFilePath);
+        this.client.listen._tempFilePath = undefined;
+      },
+    );
 
     try {
       console.info(`Joining voice channel ${channel.name}...`);

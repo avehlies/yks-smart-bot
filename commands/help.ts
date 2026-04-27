@@ -109,10 +109,10 @@ class HelpCommand extends Command {
         category === 'kickstarters'
           ? kickstarterCommands
           : category === 'listen'
-          ? listenCommands
-          : category === 'other'
-          ? otherCommands
-          : helpCommands,
+            ? listenCommands
+            : category === 'other'
+              ? otherCommands
+              : helpCommands,
     };
 
     return message.channel.send({ embeds: [helpEmbed] });

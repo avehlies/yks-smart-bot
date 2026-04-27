@@ -3,9 +3,7 @@ import fs from 'fs';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegStatic from 'ffmpeg-static';
 // wavefile: default export is { WaveFile } in CJS; use require for compatibility
-const WaveFile = require('wavefile').WaveFile as new (
-  buffer: Buffer,
-) => {
+const WaveFile = require('wavefile').WaveFile as new (buffer: Buffer) => {
   toBitDepth: (depth: string) => void;
   toSampleRate: (rate: number) => void;
   getSamples: () => Float32Array | Float32Array[];
@@ -24,10 +22,7 @@ function getTranscriber(): Promise<TranscriberFn> {
   if (!transcriberPromise) {
     transcriberPromise = (async () => {
       const { pipeline } = await import('@xenova/transformers');
-      const p = await pipeline(
-        'automatic-speech-recognition',
-        WHISPER_MODEL,
-      );
+      const p = await pipeline('automatic-speech-recognition', WHISPER_MODEL);
       return p as TranscriberFn;
     })();
   }
@@ -69,9 +64,7 @@ export const convertTo16KhzWav = (fileName: string): Promise<string> => {
       .outputOptions('-acodec', 'pcm_s16le', '-ac', '1', '-ar', '16000')
       .saveToFile(`${fileName}.wav`)
       .on('error', (e: any) => {
-        console.error(
-          `Failed to convert [${fileName}] to 16Khz WAV: ${JSON.stringify(e)}`,
-        );
+        console.error(`Failed to convert [${fileName}] to 16Khz WAV: ${JSON.stringify(e)}`);
         return reject();
       })
       .on('progress', (progress: any) => {
@@ -80,9 +73,7 @@ export const convertTo16KhzWav = (fileName: string): Promise<string> => {
         }
       })
       .on('end', () => {
-        console.info(
-          `Successfully converted [${fileName}] to 16Khz WAV at [${fileName}.wav]`,
-        );
+        console.info(`Successfully converted [${fileName}] to 16Khz WAV at [${fileName}.wav]`);
         return resolve(`${fileName}.wav`);
       });
   });

@@ -24,9 +24,12 @@ class GabeCommand extends Command {
     if (!this.client.globalRates.get(message.guild.id).has('gabe')) {
       this.client.globalRates.get(message.guild.id).add('gabe');
       const self = this;
-      setTimeout(function () {
-        self.client.globalRates.get(message.guild!.id).delete('gabe');
-      }, 1000 * 60 * 60 * 24); // once per day
+      setTimeout(
+        function () {
+          self.client.globalRates.get(message.guild!.id).delete('gabe');
+        },
+        1000 * 60 * 60 * 24,
+      ); // once per day
 
       message.channel
         .send(`Really wanted to like this podcast, the hosts are pretty funny and I'm a big fan of the South. \
