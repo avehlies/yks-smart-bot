@@ -285,6 +285,19 @@ export const simpleCommandConfigs: SimpleCommandConfig[] = [
     requireGuild: true,
   },
   {
+    id: 'gabe',
+    trigger: { aliases: ['gabe', 'terrorists', 'thesouth', 'cancel', 'virtuesignal'] },
+    akairo: { cooldown: 1000 * 60, ratelimit: 1 },
+    globalRate: { enabled: true, ttlMs: 1000 * 60 * 60 * 24 },
+    response: {
+      type: 'text',
+      content: `Really wanted to like this podcast, the hosts are pretty funny and I'm a big fan of the South. But at this point I'm gonna cancel my Patreon; the constant one-sided trashing of conservatives is just too much. It would be one thing if the jabs were funny, but it's usually they're more along the lines of "some guy was talking to me about Alex Jones and I was like, I don't want to have this conversation". Just blatant unfunny virtue signaling to the presumably overwhelmingly liberal audience.
+
+Heading back to Hollywood Handbook-- even though everyone knows they're liberal California elites, they're able to restrain themselves from flinging shit long enough to record an hour-long podcast every week. Hope you guys know that by demonizing your political opponents, you're deepening the divide in America, and when Americans commit acts of terror, it's because of this environment that you're helping to perpetuate.`,
+    },
+    requireGuild: true,
+  },
+  {
     id: 'mug',
     trigger: { aliases: ['mug', 'burgymug'] },
     akairo: shouldApplyMugCooldown ? { cooldown: 1000 * 60 } : undefined,
