@@ -171,13 +171,20 @@ export const simpleCommandConfigs: SimpleCommandConfig[] = [
     id: 'bo',
     trigger: { aliases: ['bo'] },
     akairo: { cooldown: 1000 * 60 * 60, ratelimit: 1 },
-    response: { type: 'text', content: '<@225822701132972034> can you handle this please.', reply: true },
+    response: {
+      type: 'text',
+      content: '<@225822701132972034> can you handle this please.',
+      reply: true,
+    },
   },
   {
     id: 'crash',
     trigger: { aliases: ['crash', 'carcrash', 'rearend', 'rearended', 'dashcam'] },
     akairo: { cooldown: 1000 * 60, ratelimit: 1 },
-    response: { type: 'text', content: 'https://www.youtube.com/watch?v=aTBHQXzt_C0&feature=youtu.be' },
+    response: {
+      type: 'text',
+      content: 'https://www.youtube.com/watch?v=aTBHQXzt_C0&feature=youtu.be',
+    },
   },
   {
     id: 'ftp',
@@ -185,7 +192,8 @@ export const simpleCommandConfigs: SimpleCommandConfig[] = [
     akairo: { cooldown: 1000 * 60, ratelimit: 1 },
     response: {
       type: 'text',
-      content: 'https://discord.com/channels/641743927799447553/682325261978697732/1249099267927183391',
+      content:
+        'https://discord.com/channels/641743927799447553/682325261978697732/1249099267927183391',
     },
   },
   {
@@ -208,7 +216,8 @@ export const simpleCommandConfigs: SimpleCommandConfig[] = [
     akairo: { cooldown: 1000 * 60, ratelimit: 1 },
     response: {
       type: 'text',
-      content: 'https://discord.com/channels/641743927799447553/682325261978697732/1140406217836081222',
+      content:
+        'https://discord.com/channels/641743927799447553/682325261978697732/1140406217836081222',
     },
   },
   {

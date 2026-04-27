@@ -243,19 +243,18 @@ const backfillMissingTranscriptions = async () => {
   try {
     const { transcribeClip } = require('../transcribe');
     const clipsWithoutTranscription = await ClipsModel.find({
-      $or: [
-        { transcription: { $exists: false } },
-        { transcription: null },
-      ],
+      $or: [{ transcription: { $exists: false } }, { transcription: null }],
     })
-    .limit(10)
-    .lean();
+      .limit(10)
+      .lean();
 
     if (clipsWithoutTranscription.length === 0) {
       return;
     }
 
-    console.info(`Backfilling transcriptions for ${clipsWithoutTranscription.length} clip(s) (one at a time).`);
+    console.info(
+      `Backfilling transcriptions for ${clipsWithoutTranscription.length} clip(s) (one at a time).`,
+    );
     for (const clip of clipsWithoutTranscription) {
       const url = clip.url;
       if (!url) continue;
@@ -282,7 +281,10 @@ const backfillMissingTranscriptions = async () => {
 const gatherAllClips = async (client: YKSSmartBot) => {
   const guild = client.util.resolveGuild(process.env.YKS_GUILD_ID!, client.guilds.cache);
   if (!guild) return null;
-  const channel = client.util.resolveChannel(process.env.YKS_CLIP_CHANNEL_ID!, guild.channels.cache);
+  const channel = client.util.resolveChannel(
+    process.env.YKS_CLIP_CHANNEL_ID!,
+    guild.channels.cache,
+  );
   if (!channel || !channel.isText()) return null;
   console.info('Fetching all messages in the YKS clips channel and fillng in the gaps.');
   let messages = Array.from((await channel.messages.fetch({ limit: 100 }))?.values() || []);

@@ -84,11 +84,12 @@ class ConfigurableCommand extends Command {
 export const createConfigurableCommandClasses = (
   configs: SimpleCommandConfig[],
 ): ConfigurableCommandClass[] => {
-  return configs.map((config) =>
-    class extends ConfigurableCommand {
-      constructor() {
-        super(config);
-      }
-    },
+  return configs.map(
+    (config) =>
+      class extends ConfigurableCommand {
+        constructor() {
+          super(config);
+        }
+      },
   );
 };

@@ -66,7 +66,7 @@ class MemberWelcomeListener extends Listener {
       'If you need to know what episode something happened in, ask vinny.',
       'If you see JF or DB in here, avert your eyes from their posts as a sign of respect.',
       'Vote for your favorite episode # using the command `!best <episode number>`',
-      "Coming in on a bad note. Don't know ya and don't know if I care to given who ya sight as a source. Name's Saley, the GodKing. I've been accused of being a bit of a peacekeeper and ring leader of our little rag tag group. Ninja is a trusted second, and Roman is my official go to boy on vibes. Just as a fair warning, don't bring that name up again. You won't like what you get. That being said, strike 1, and welcome to the group."
+      "Coming in on a bad note. Don't know ya and don't know if I care to given who ya sight as a source. Name's Saley, the GodKing. I've been accused of being a bit of a peacekeeper and ring leader of our little rag tag group. Ninja is a trusted second, and Roman is my official go to boy on vibes. Just as a fair warning, don't bring that name up again. You won't like what you get. That being said, strike 1, and welcome to the group.",
     ];
     return member.guild.systemChannel?.send({
       content: `Welcome, ${member}! ${responses[Math.floor(Math.random() * responses.length)]}`,

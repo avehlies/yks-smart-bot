@@ -16,11 +16,7 @@ import ClipsModel from '../../db/clips';
 
 const commandName = 'findtheclimp';
 
-function transcriptionSnippetAround (
-  text: string,
-  phrase: string,
-  maxLen: number
-): string {
+function transcriptionSnippetAround(text: string, phrase: string, maxLen: number): string {
   if (text.length <= maxLen) return text;
   if (!phrase.trim()) return text.substring(0, maxLen);
 
@@ -34,13 +30,13 @@ function transcriptionSnippetAround (
 
   let result = text.substring(start, start + maxLen);
   if (start > 0) {
-    result = "..." + result;
+    result = '...' + result;
   }
   if (start + maxLen < text.length) {
-    result = result + "...";
+    result = result + '...';
   }
   return result;
-};
+}
 
 function sliceMap<K, V>(map: Map<K, V>, start: number, end: number): Map<K, V> {
   const result = new Map<K, V>();
@@ -89,8 +85,7 @@ const clipsCommand: CommandInterface = {
       const results = await ClipsModel.find({
         $text: { $search: searchPhrase },
         transcription: { $exists: true },
-      })
-      .sort({ score: { $meta: 'textScore' } });
+      }).sort({ score: { $meta: 'textScore' } });
 
       if (!results || results.length == 0) {
         return interaction.respond([{ name: 'No results.', value: '' }]);
@@ -104,11 +99,7 @@ const clipsCommand: CommandInterface = {
       const data = sliceMap(resultsHash, 0, 20);
 
       const choices = Array.from(data.values()).map((result: any) => {
-        const name = transcriptionSnippetAround(
-          result.transcription,
-          searchPhrase,
-          94
-        );
+        const name = transcriptionSnippetAround(result.transcription, searchPhrase, 94);
         // const name = result.transcription.substring(0, 94);
         return { name, value: result._id };
       });
