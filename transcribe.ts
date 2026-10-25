@@ -35,22 +35,54 @@ export const downloadFile = (url: string): Promise<string | null> => {
       const urlObj = new URL(url);
       const fileName = `${__dirname}/${urlObj.pathname.split('/').pop()}`;
       const file = fs.createWriteStream(fileName);
-      https.get(urlObj.toString(), (response) => {
+      let settled = false;
+
+      const failDownload = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        file.destroy();
+        fs.unlink(fileName, () => {});
+        console.error(`Failed to download clip: ${error.message}`);
+        reject(error);
+      };
+
+      const request = https.get(urlObj.toString(), (response) => {
+        const { statusCode } = response;
+        const contentType = response.headers['content-type'] ?? 'unknown';
+        const contentLength = response.headers['content-length'] ?? 'unknown';
+        console.info(
+          `Clip download response: HTTP ${statusCode}, content-type: ${contentType}, content-length: ${contentLength}`,
+        );
+
+        if (!statusCode || statusCode < 200 || statusCode >= 300) {
+          response.resume();
+          failDownload(new Error(`Clip download returned HTTP ${statusCode ?? 'unknown'}`));
+          return;
+        }
+
+        response.on('error', failDownload);
         response.pipe(file);
 
-        // after download completed close filestream
+        // Resolve only once the file descriptor has closed and its size is available.
         file.on('finish', () => {
-          file.close();
-          console.info('Download of clip completed');
-          return resolve(fileName);
+          file.close((closeError) => {
+            if (closeError) {
+              failDownload(closeError);
+              return;
+            }
+            if (settled) return;
+            settled = true;
+            console.info(`Download of clip completed (${fs.statSync(fileName).size} bytes)`);
+            resolve(fileName);
+          });
         });
-        file.on('error', () => {
-          reject();
-        });
+        file.on('error', failDownload);
       });
+      request.on('error', failDownload);
     } catch (e: any) {
-      console.error(`Failed to download clip: ${JSON.stringify(e)}`);
-      reject();
+      const error = e instanceof Error ? e : new Error(String(e));
+      console.error(`Failed to download clip: ${error.message}`);
+      reject(error);
     }
   });
 };
@@ -63,8 +95,9 @@ export const convertTo16KhzWav = (fileName: string): Promise<string> => {
       .input(fileName)
       .outputOptions('-acodec', 'pcm_s16le', '-ac', '1', '-ar', '16000')
       .saveToFile(`${fileName}.wav`)
-      .on('error', (e: any) => {
-        console.error(`Failed to convert [${fileName}] to 16Khz WAV: ${JSON.stringify(e)}`);
+      .on('error', (error: Error, _stdout: string, stderr: string) => {
+        console.error(`Failed to convert [${fileName}] to 16KHz WAV: ${error.message}`);
+        console.error(`FFmpeg stderr for [${fileName}]:\n${stderr}`);
         return reject();
       })
       .on('progress', (progress: any) => {

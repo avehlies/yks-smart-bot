@@ -250,8 +250,8 @@ export const simpleCommandConfigs: SimpleCommandConfig[] = [
   {
     id: 'sporange',
     trigger: { regex: /sporange/i },
-    akairo: { cooldown: 28800000, ratelimit: 1, category: 'easter-egg' },
-    globalRate: { enabled: true, ttlMs: 1000 * 60 * 60 * 24 * 7 },
+    akairo: { cooldown: 1000 * 60, ratelimit: 1, category: 'easter-egg' },
+    globalRate: { enabled: true, ttlMs: 1000 * 60 },
     response: { type: 'text', content: "it's a new kind of orange", reply: true },
     requireGuild: true,
   },
@@ -263,22 +263,41 @@ export const simpleCommandConfigs: SimpleCommandConfig[] = [
     response: {
       type: 'randomFile',
       items: [
-        { name: 'jf.jpg', path: `${__dirname}/../../assets/staysippin/jf.jpg` },
         {
-          name: 'jf-time-magazine.png',
-          path: `${__dirname}/../../assets/staysippin/jf-time-magazine.png`,
+          name: '8chbein.png',
+          path: `${__dirname}/../../assets/staysippin/8chbein.png`,
         },
         {
-          name: 'youngonion.png',
-          path: `${__dirname}/../../assets/staysippin/YoungOnion.png`,
+          name: 'adhd_md.png',
+          path: `${__dirname}/../../assets/staysippin/adhd_md.jpg`,
         },
         {
           name: 'heycraisins.jpg',
           path: `${__dirname}/../../assets/staysippin/heycraisins.jpg`,
         },
         {
+          name: 'jf.jpg',
+          path: `${__dirname}/../../assets/staysippin/jf.jpg`
+        },
+        {
+          name: 'jf-nyc.png',
+          path: `${__dirname}/../../assets/staysippin/jf-nyc.png`,
+        },
+        {
+          name: 'jf-time-magazine.png',
+          path: `${__dirname}/../../assets/staysippin/jf-time-magazine.jpg`,
+        },
+        {
+          name: 'kristin.jpg',
+          path: `${__dirname}/../../assets/staysippin/kristin.jpg`,
+        },
+        {
           name: 'mrs-craisins.jpg',
           path: `${__dirname}/../../assets/staysippin/mrs-craisins.jpg`,
+        },
+        {
+          name: 'youngonion.png',
+          path: `${__dirname}/../../assets/staysippin/YoungOnion.png`,
         },
       ],
     },

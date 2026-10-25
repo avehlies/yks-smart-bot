@@ -15,6 +15,37 @@ import YKSSmartBot from '../../bot';
 import ClipsModel from '../../db/clips';
 
 const commandName = 'findtheclimp';
+const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000;
+
+type CachedSearch = {
+  searchPhrase: string;
+  expiresAt: number;
+};
+
+const searchCache = new Map<string, CachedSearch>();
+
+function searchCacheKey(userId: string, objectId: string): string {
+  return `${userId}:${objectId}`;
+}
+
+function setCachedSearch(key: string, searchPhrase: string): void {
+  searchCache.set(key, {
+    searchPhrase,
+    expiresAt: Date.now() + SEARCH_CACHE_TTL_MS,
+  });
+}
+
+function getCachedSearch(key: string): string | undefined {
+  const cached = searchCache.get(key);
+  if (!cached) return undefined;
+
+  if (cached.expiresAt < Date.now()) {
+    searchCache.delete(key);
+    return undefined;
+  }
+
+  return cached.searchPhrase;
+}
 
 function transcriptionSnippetAround(text: string, phrase: string, maxLen: number): string {
   if (text.length <= maxLen) return text;
@@ -99,9 +130,11 @@ const clipsCommand: CommandInterface = {
       const data = sliceMap(resultsHash, 0, 20);
 
       const choices = Array.from(data.values()).map((result: any) => {
+        const objectId = String(result._id);
         const name = transcriptionSnippetAround(result.transcription, searchPhrase, 94);
+        setCachedSearch(searchCacheKey(interaction.user.id, objectId), searchPhrase);
         // const name = result.transcription.substring(0, 94);
-        return { name, value: result._id };
+        return { name, value: objectId };
       });
 
       await interaction.respond(choices);
@@ -153,6 +186,10 @@ const clipsCommand: CommandInterface = {
       await interaction.deferUpdate();
       const [, confirmStr, objectIdStr, indexStr] = interaction.customId.split('-');
       const confirm = confirmStr === 'confirm';
+      const searchPhrase =
+        typeof objectIdStr === 'string'
+          ? getCachedSearch(searchCacheKey(interaction.user.id, objectIdStr))
+          : undefined;
 
       const original = client.commandInteractions.findIndex(
         (i) => i.id === interaction.message.interaction?.id,
@@ -189,11 +226,14 @@ const clipsCommand: CommandInterface = {
               const url = attachment.proxyURL;
               if (!url) return;
 
+              searchCache.delete(searchCacheKey(interaction.user.id, objectIdStr));
               return channel.send({
                 files: [url],
                 embeds: [
                   new MessageEmbed().setDescription(
-                    `Requested by ${interaction.member?.user} using the \`/findtheclimp\` command.`,
+                    `Requested by ${interaction.member?.user} using the \`/findtheclimp\` command${
+                      searchPhrase ? ` for "${searchPhrase}"` : ''
+                    }.`,
                   ),
                 ],
               });
@@ -201,6 +241,9 @@ const clipsCommand: CommandInterface = {
           }
         }
       } else {
+        if (typeof objectIdStr === 'string') {
+          searchCache.delete(searchCacheKey(interaction.user.id, objectIdStr));
+        }
         if (original >= 0) {
           await client.commandInteractions[original].editReply({
             content: `Didn't post. Is that a first for you?`,
